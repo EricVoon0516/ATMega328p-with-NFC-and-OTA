@@ -2,14 +2,18 @@
 #include <MFRC522.h>
 #include <Servo.h>
 
-#include <FS.h>
-#include <SPIFFS.h>
+#include <SoftwareSerial.h>
 
 #define SS_PIN    10
 #define RST_PIN   9
 #define SERVO_PIN A5
 #define SUCCESS_LED 8
 #define FAIL_LED 7
+
+const int RX = 2;
+const int TX = 3;
+
+SoftwareSerial serialComm(RX, TX);
 
 MFRC522 rfid(SS_PIN, RST_PIN);
 Servo servo;
@@ -19,6 +23,7 @@ int angle = 0; // the current angle of servo motor
 
 void setup() {
   Serial.begin(9600);
+  serialComm.begin(9600);
   SPI.begin(); // init SPI bus
   rfid.PCD_Init(); // init MFRC522
   servo.attach(SERVO_PIN);
@@ -79,23 +84,30 @@ void loop() {
 }
 
 
-void Read_code()
-{
-   while (!Serial.available());
-  
-  // Extract the file name from the URL
-  String fileName = "received_code.ino";
+void Read_code() {
+    while (serialComm.available() == 0);
+    int data = serialComm.read();
+    if (data == '#') {
+        while (serialComm.available() == 0);
+        rename = "";
+        while (serialComm.available() > 0) {
+            char c = char(serialComm.read());
+            if (c == ',') {
+                break;
+            }
+            fileName += c;
+        }
 
-  // Save the code file to the UNO's memory
-  File file = SD.open(fileName, FILE_WRITE);
-  if (file) {
-    while (Serial.available()) {
-      file.write(Serial.read());
+        Serial.println(rename);
+        File tmpfile = SPIFFS.open(tmpfile, "w");
+        if (!tmpfile) {
+            Serial.println("Failed to open file for writing");
+            return;
+        }
+
+        while (serialComm.available() > 0) {
+            tmpfile.write((uint8_t)serialComm.read());
+        }
+        tmpfile.close();
     }
-    file.close();
-    Serial.println("Code file saved");
-  } else {
-    Serial.println("Failed to open file for writing");
-  }
-
 }
